@@ -9,33 +9,25 @@
       "src": "HoldemArea/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "HoldemArea/dist"
+        "buildCommand": "npm install && npm run build",
+        "distDir": "dist"
       }
     },
     {
       "src": "Texas-Holdem-Odds-Calculator/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "Texas-Holdem-Odds-Calculator/dist"
+        "buildCommand": "npm install && npm run build",
+        "distDir": "dist"
       }
     }
   ],
   "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/odds",
-      "dest": "/Texas-Holdem-Odds-Calculator/dist/index.html"
-    },
-    {
-      "src": "/odds/(.*)",
-      "dest": "/Texas-Holdem-Odds-Calculator/dist/index.html"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/HoldemArea/dist/index.html"
-    }
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+
+    { "src": "/odds", "dest": "/Texas-Holdem-Odds-Calculator/dist/index.html" },
+    { "src": "/odds/(.*)", "dest": "/Texas-Holdem-Odds-Calculator/dist/index.html" },
+
+    { "src": "/(.*)", "dest": "/HoldemArea/dist/index.html" }
   ]
 }
