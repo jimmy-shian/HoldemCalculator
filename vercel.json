@@ -32,6 +32,6 @@
       "handle": "filesystem"
     },
 
-    { "src": "/(.*)", "dest": "/HoldemArea/index.html" }
+    { "src": "/(.*)", "dest": "/HoldemArea/index.html", "check": true }
   ]
 }
