@@ -6,6 +6,7 @@ import { playSound } from './services/soundService';
 import { PlayerSeat } from './components/PlayerSeat';
 import { CardComponent } from './components/CardComponent';
 import { GameControls } from './components/GameControls';
+import { joinRoom, startHandOnline } from './services/onlineService';
 import { Trophy, Clock, Hash, CheckCircle } from 'lucide-react';
 
 // --- Particle/Chip Animation Component ---
@@ -76,6 +77,8 @@ const App: React.FC = () => {
   const [timeStr, setTimeStr] = useState('');
   const [recoveryCode, setRecoveryCode] = useState('');
   const [showChipAnim, setShowChipAnim] = useState<{start: {x:number, y:number}, target: {x:number, y:number}} | null>(null);
+  const [isOnlineMode, setIsOnlineMode] = useState(false);
+  const [onlinePlayerIndex, setOnlinePlayerIndex] = useState<number | null>(null);
 
   const turnTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gameLoopRef = useRef<boolean>(false);
@@ -101,7 +104,22 @@ const App: React.FC = () => {
 
   // --- Logic ---
 
+  const handleJoinQueueOnline = async (name: string) => {
+      try {
+          const res = await joinRoom(name);
+          setOnlinePlayerIndex(res.playerIndex);
+          setIsSpectating(false);
+          setNotification(`歡迎 ${name}! 已加入線上牌桌`);
+      } catch (error) {
+          setNotification('線上入座失敗，請稍後再試');
+      }
+  };
+
   const handleJoinQueue = (name: string) => {
+      if (isOnlineMode) {
+          handleJoinQueueOnline(name);
+          return;
+      }
       setPendingPlayerName(name);
       setNotification(`歡迎 ${name}! 請等待下一局開始...`);
   };
@@ -364,6 +382,7 @@ const App: React.FC = () => {
 
   // --- AI Logic ---
   useEffect(() => {
+    if (isOnlineMode) return;
     if (gameState.stage === GameStage.IDLE || gameState.stage === GameStage.SHOWDOWN || gameState.winners.length > 0) return;
 
     const currentPlayer = players[gameState.currentTurnIndex];
@@ -413,10 +432,67 @@ const App: React.FC = () => {
         turnTimeoutRef.current = setTimeout(aiAction, delay);
     }
     return () => { if (turnTimeoutRef.current) clearTimeout(turnTimeoutRef.current); };
-  }, [gameState.currentTurnIndex, gameState.stage, gameState.highestBet, isSpectating]); 
+  }, [gameState.currentTurnIndex, gameState.stage, gameState.highestBet, isSpectating, isOnlineMode]); 
 
   // --- Init ---
+  const startNewHandOnline = async () => {
+    if (!isOnlineMode) return;
+    try {
+      const { room } = await startHandOnline();
+      const deckSeed = room.deckSeed;
+      const newDeck = createDeck(deckSeed);
+
+      setShowChipAnim(null);
+      setWinningHandResult(null);
+
+      setPlayers(prev => {
+        const dealed = prev.map(p => {
+          const serverPlayer = room.players[p.id] ?? room.players[0];
+          return {
+            ...p,
+            chips: serverPlayer.chips,
+            bet: serverPlayer.bet,
+            totalHandBet: serverPlayer.totalHandBet,
+            hasFolded: serverPlayer.hasFolded,
+            isDealer: p.id === room.dealerIndex,
+            cards: [newDeck.pop()!, newDeck.pop()!],
+            isActive: true,
+            // Keep loan text if present, otherwise clear
+            actionText: p.actionText === '貸款 (Loan)' ? '貸款 (Loan)' : undefined,
+          };
+        });
+        return dealed;
+      });
+
+      const bbIndex = (room.dealerIndex + 2) % PLAYER_COUNT;
+      const firstActionIndex = (bbIndex + 1) % PLAYER_COUNT;
+
+      setDeck(newDeck);
+      setGameState(prev => ({
+        stage: GameStage.PREFLOP,
+        pot: room.pot,
+        communityCards: [],
+        deckSeed,
+        currentTurnIndex: firstActionIndex,
+        dealerIndex: room.dealerIndex,
+        highestBet: room.highestBet,
+        minRaise: BIG_BLIND,
+        winners: [],
+        winningHand: undefined,
+        roundNumber: prev.roundNumber + 1,
+      }));
+      setNotification(`第 ${gameState.roundNumber + 1} 局開始`);
+    } catch (error) {
+      setNotification('線上開局失敗，請稍後再試');
+    }
+  };
+
   const startNewHand = () => {
+    if (isOnlineMode) {
+      startNewHandOnline();
+      return;
+    }
+
     setShowChipAnim(null);
     setWinningHandResult(null);
 
@@ -507,8 +583,9 @@ const App: React.FC = () => {
   };
 
   // --- Render ---
-  const humanPlayer = players[0];
-  const canAct = !isSpectating && gameState.currentTurnIndex === 0 && gameState.winners.length === 0 && humanPlayer.chips > 0;
+  const localPlayerIndex = isOnlineMode && onlinePlayerIndex !== null ? onlinePlayerIndex : 0;
+  const humanPlayer = players[localPlayerIndex];
+  const canAct = !isSpectating && gameState.currentTurnIndex === localPlayerIndex && gameState.winners.length === 0 && humanPlayer.chips > 0;
   const currentCallAmount = gameState.highestBet - humanPlayer.bet;
   
   return (
@@ -533,6 +610,13 @@ const App: React.FC = () => {
 
         {/* Password Recovery Input */}
         <div className="pointer-events-auto flex flex-col items-end gap-2">
+            <button
+                type="button"
+                onClick={() => setIsOnlineMode(prev => !prev)}
+                className="text-xs px-2 py-1 rounded-md border border-slate-600 bg-slate-800/80 text-slate-200 hover:bg-slate-700"
+            >
+                {isOnlineMode ? '模式：線上 4 人' : '模式：單機 / 與機器人'}
+            </button>
             <div className="text-xs text-slate-400">Blinds: {SMALL_BLIND}/{BIG_BLIND}</div>
             <form onSubmit={handleRecoverySubmit} className="flex gap-1 bg-slate-800/80 p-1 rounded-md border border-slate-700 backdrop-blur-sm">
                 <input 
@@ -648,10 +732,10 @@ const App: React.FC = () => {
       {/* Controls */}
       {!isSpectating && gameState.stage !== GameStage.IDLE && gameState.winners.length === 0 && (
           <GameControls
-            onCall={() => handleAction(0, 'call')}
-            onFold={() => handleAction(0, 'fold')}
-            onRaise={(amount) => handleAction(0, 'raise', amount)}
-            onCheck={() => handleAction(0, 'check')}
+            onCall={() => handleAction(localPlayerIndex, 'call')}
+            onFold={() => handleAction(localPlayerIndex, 'fold')}
+            onRaise={(amount) => handleAction(localPlayerIndex, 'raise', amount)}
+            onCheck={() => handleAction(localPlayerIndex, 'check')}
             canCheck={currentCallAmount === 0}
             canRaise={humanPlayer.chips > gameState.highestBet + BIG_BLIND}
             callAmount={currentCallAmount}
