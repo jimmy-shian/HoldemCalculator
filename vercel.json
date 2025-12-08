@@ -25,9 +25,13 @@
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1" },
 
-    { "src": "/odds", "dest": "/Texas-Holdem-Odds-Calculator/dist/index.html" },
-    { "src": "/odds/(.*)", "dest": "/Texas-Holdem-Odds-Calculator/dist/index.html" },
+    { "src": "/odds", "dest": "/Texas-Holdem-Odds-Calculator/index.html" },
+    { "src": "/odds/(.*)", "dest": "/Texas-Holdem-Odds-Calculator/index.html" },
 
-    { "src": "/(.*)", "dest": "/HoldemArea/dist/index.html" }
+    {
+      "handle": "filesystem"
+    },
+
+    { "src": "/(.*)", "dest": "/HoldemArea/index.html" }
   ]
 }
