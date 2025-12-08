@@ -1,0 +1,68 @@
+name: Deploy Combined App
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # 1. Build 主程式 (HoldemArea)
+      - name: Build Main App
+        run: |
+          cd HoldemArea
+          npm install
+          npm run build
+          
+      # 2. Build 計算器 (Odds Calculator)
+      - name: Build Odds Calculator
+        run: |
+          cd Texas-Holdem-Odds-Calculator
+          npm install
+          npm run build
+
+      # 3. 合併檔案 (把計算器塞進主程式的 odds 資料夾)
+      - name: Merge Apps
+        run: |
+          mkdir final_build
+          # 複製主程式到根目錄
+          cp -r HoldemArea/dist/* final_build/
+          # 建立 odds 資料夾
+          mkdir final_build/odds
+          # 複製計算器進去
+          cp -r Texas-Holdem-Odds-Calculator/dist/* final_build/odds/
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./final_build
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
