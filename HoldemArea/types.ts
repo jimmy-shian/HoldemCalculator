@@ -72,3 +72,8 @@ export interface GameState {
   winningHand?: string;
   roundNumber: number;
 }
+
+export enum GameMode {
+  SINGLEPLAYER = 'SINGLEPLAYER',
+  MULTIPLAYER = 'MULTIPLAYER'
+}
