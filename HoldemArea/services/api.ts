@@ -34,6 +34,20 @@ export interface GameStateResponse {
   players: Player[];
 }
 
+export interface RoundEndRequest {
+  tableId: string;
+  roundNumber: number;
+  gameState: GameState;
+  players: Player[];
+  winners: number[];
+}
+
+const JOIN_TABLE_ENDPOINT = '/api/join-table';
+const LEAVE_TABLE_ENDPOINT = '/api/leave-table';
+const ACTION_ENDPOINT = '/api/action';
+const GAME_STATE_ENDPOINT = '/api/game-state';
+const ROUND_END_ENDPOINT = '/api/round-end';
+
 // --- API Functions ---
 
 /**
@@ -41,9 +55,26 @@ export interface GameStateResponse {
  */
 export const joinTable = async (payload: JoinTableRequest): Promise<JoinTableResponse> => {
   console.log(`[API] joinTable called:`, payload);
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 300));
-  return { success: true, message: "Joined successfully" };
+  try {
+    const response = await fetch(JOIN_TABLE_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      console.error('[API] joinTable failed with status', response.status);
+      return { success: false, message: 'Failed to join table' };
+    }
+
+    const data = (await response.json()) as JoinTableResponse;
+    return data;
+  } catch (error) {
+    console.error('[API] joinTable error:', error);
+    return { success: false, message: 'Network error' };
+  }
 };
 
 /**
@@ -51,7 +82,26 @@ export const joinTable = async (payload: JoinTableRequest): Promise<JoinTableRes
  */
 export const leaveTable = async (tableId: string, playerId: number): Promise<{ success: boolean }> => {
   console.log(`[API] leaveTable called for player ${playerId} on table ${tableId}`);
-  return { success: true };
+  try {
+    const response = await fetch(LEAVE_TABLE_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ tableId, playerId }),
+    });
+
+    if (!response.ok) {
+      console.error('[API] leaveTable failed with status', response.status);
+      return { success: false };
+    }
+
+    const data = (await response.json()) as { success: boolean };
+    return data;
+  } catch (error) {
+    console.error('[API] leaveTable error:', error);
+    return { success: false };
+  }
 };
 
 /**
@@ -60,7 +110,26 @@ export const leaveTable = async (tableId: string, playerId: number): Promise<{ s
 export const sendAction = async (payload: ActionRequest): Promise<GameStateResponse | null> => {
   console.log(`[API] sendAction called:`, payload);
   // In a real app, this would return the updated GameState from the server.
-  return null;
+  try {
+    const response = await fetch(ACTION_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      console.error('[API] sendAction failed with status', response.status);
+      return null;
+    }
+
+    const data = (await response.json()) as GameStateResponse;
+    return data;
+  } catch (error) {
+    console.error('[API] sendAction error:', error);
+    return null;
+  }
 };
 
 /**
@@ -68,5 +137,44 @@ export const sendAction = async (payload: ActionRequest): Promise<GameStateRespo
  */
 export const fetchGameState = async (tableId: string): Promise<GameStateResponse | null> => {
   console.log(`[API] fetchGameState called for table ${tableId}`);
-  return null;
+  try {
+    const url = `${GAME_STATE_ENDPOINT}?tableId=${encodeURIComponent(tableId)}`;
+    const response = await fetch(url, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      console.error('[API] fetchGameState failed with status', response.status);
+      return null;
+    }
+
+    const data = (await response.json()) as GameStateResponse;
+    return data;
+  } catch (error) {
+    console.error('[API] fetchGameState error:', error);
+    return null;
+  }
+};
+
+export const sendRoundEnd = async (payload: RoundEndRequest): Promise<GameStateResponse | null> => {
+  try {
+    const response = await fetch(ROUND_END_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      console.error('[API] sendRoundEnd failed with status', response.status);
+      return null;
+    }
+
+    const data = (await response.json()) as GameStateResponse;
+    return data;
+  } catch (error) {
+    console.error('[API] sendRoundEnd error:', error);
+    return null;
+  }
 };

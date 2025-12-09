@@ -3,7 +3,7 @@ import { Card, GameStage, Player, GameState, HandRank, HandResult, GameMode } fr
 import { INITIAL_CHIPS, SMALL_BLIND, BIG_BLIND, PLAYER_COUNT, ANIMATION_DELAY, RECOVERY_PASSWORD, MAX_ALLIN } from './constants';
 import { createDeck, evaluateHand } from './services/pokerEngine';
 import { playSound } from './services/soundService';
-import { joinTable, sendAction } from './services/api';
+import { joinTable, sendAction, sendRoundEnd } from './services/api';
 import { PlayerSeat } from './components/PlayerSeat';
 import { CardComponent } from './components/CardComponent';
 import { GameControls } from './components/GameControls';
@@ -400,6 +400,19 @@ const App: React.FC = () => {
   };
 
   const declareWinner = (winnerIds: number[]) => {
+      sendRoundEnd({
+          tableId: 'table-1',
+          roundNumber: gameState.roundNumber,
+          gameState,
+          players,
+          winners: winnerIds,
+      }).then(response => {
+          if (response) {
+              setGameState(prev => ({ ...prev, ...response.gameState }));
+              setPlayers(response.players);
+          }
+      });
+
       setGameState(prev => ({ ...prev, winners: winnerIds }));
       
       const winnerCount = winnerIds.length;
